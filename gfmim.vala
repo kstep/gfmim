@@ -3,7 +3,7 @@ using Gtk;
 // Commands {{{
 
 // Common declarations {{{2
-errordomain GvifmCommandError
+errordomain GfmimCommandError
 {
     NotFound,
     NotParseable,
@@ -14,13 +14,13 @@ errordomain GvifmCommandError
     NoRangeAllowed,
 }
 
-public struct GvifmRange
+public struct GfmimRange
 {
     string firstline;
     string lastline;
 }
 
-public enum GvifmCommandNargs
+public enum GfmimCommandNargs
 {
     NONE,   // 0
     SINGLE, // 1
@@ -29,7 +29,7 @@ public enum GvifmCommandNargs
     MANY,   // +
 }
 
-public abstract class GvifmCommand
+public abstract class GfmimCommand
 {
     protected string _name      = "";
     protected string _shortname = "";
@@ -37,9 +37,9 @@ public abstract class GvifmCommand
 
     protected bool _has_bang  = false;
     protected bool _has_range = false;
-    protected GvifmCommandNargs _num_args = GvifmCommandNargs.NONE;
+    protected GfmimCommandNargs _num_args = GfmimCommandNargs.NONE;
     protected int _def_count = -1;
-    protected GvifmWindow _parent;
+    protected GfmimWindow _parent;
 
     public string shortname { get { return _shortname; } }
     public string fullname { get { return _fullname; } }
@@ -96,28 +96,28 @@ public abstract class GvifmCommand
         return result;
     }
 
-    public string[] parse_args(string args) throws GvifmCommandError.TrailingChars, GvifmCommandError.ArgRequired
+    public string[] parse_args(string args) throws GfmimCommandError.TrailingChars, GfmimCommandError.ArgRequired
     {
         string[] result = {};
         switch (this._num_args)
         {
-        case GvifmCommandNargs.NONE: 
+        case GfmimCommandNargs.NONE: 
             if (args.len() > 0)
-                throw new GvifmCommandError.TrailingChars("E488: trailing characters");
+                throw new GfmimCommandError.TrailingChars("E488: trailing characters");
             break;
-        case GvifmCommandNargs.SINGLE:
-        case GvifmCommandNargs.MANY:
+        case GfmimCommandNargs.SINGLE:
+        case GfmimCommandNargs.MANY:
             if (args.len() < 1)
-                throw new GvifmCommandError.ArgRequired("E475: argument required");
-            if (this._num_args == GvifmCommandNargs.MANY)
+                throw new GfmimCommandError.ArgRequired("E475: argument required");
+            if (this._num_args == GfmimCommandNargs.MANY)
                 result = this.split_string(args);
             else
                 result = { args };
             break;
-        case GvifmCommandNargs.ANY:
+        case GfmimCommandNargs.ANY:
             result = this.split_string(args);
             break;
-        case GvifmCommandNargs.ONE:
+        case GfmimCommandNargs.ONE:
             if (args.len() > 0)
                 result = { args };
             break;
@@ -127,17 +127,17 @@ public abstract class GvifmCommand
         return result;
     }
 
-    public bool check(bool bang = false, GvifmRange? range = null) throws GvifmCommandError.NoBangAllowed, GvifmCommandError.NoRangeAllowed
+    public bool check(bool bang = false, GfmimRange? range = null) throws GfmimCommandError.NoBangAllowed, GfmimCommandError.NoRangeAllowed
     {
-        if (bang && !this._has_bang) throw new GvifmCommandError.NoBangAllowed("E477: ! is not allowed");
-        if (range != null && !this._has_range) throw new GvifmCommandError.NoRangeAllowed("E481: no range allowed");
+        if (bang && !this._has_bang) throw new GfmimCommandError.NoBangAllowed("E477: ! is not allowed");
+        if (range != null && !this._has_range) throw new GfmimCommandError.NoRangeAllowed("E481: no range allowed");
         /*int ln = args.length;*/
-        /*if ((ln == 0 && this._num_args == GvifmCommandNargs.NONE)*/
-            /*|| (ln == 1 && this._num_args == GvifmCommandNargs.SINGLE)*/
-            /*|| (ln >= 0 && this._num_args == GvifmCommandNargs.ANY)*/
-            /*|| (ln >= 1 && this._num_args == GvifmCommandNargs.MANY)*/
-            /*|| (0 <= ln && ln <= 1 && this._num_args == GvifmCommandNargs.ONE))*/
-        /*{} else throw new GvifmCommandError.Incorrect("E474: invalid argument");*/
+        /*if ((ln == 0 && this._num_args == GfmimCommandNargs.NONE)*/
+            /*|| (ln == 1 && this._num_args == GfmimCommandNargs.SINGLE)*/
+            /*|| (ln >= 0 && this._num_args == GfmimCommandNargs.ANY)*/
+            /*|| (ln >= 1 && this._num_args == GfmimCommandNargs.MANY)*/
+            /*|| (0 <= ln && ln <= 1 && this._num_args == GfmimCommandNargs.ONE))*/
+        /*{} else throw new GfmimCommandError.Incorrect("E474: invalid argument");*/
         return true;
     }
 
@@ -146,7 +146,7 @@ public abstract class GvifmCommand
         return name.len() >= this._shortname.len() && this._fullname.has_prefix(name);
     }
 
-    public virtual int perform(bool bang = false, GvifmRange? range = null, string args = "") throws GvifmCommandError
+    public virtual int perform(bool bang = false, GfmimRange? range = null, string args = "") throws GfmimCommandError
     {
         stderr.printf("oops!\n");
         return 0;
@@ -156,16 +156,16 @@ public abstract class GvifmCommand
 
 // Implemented commands {{{2
 
-public class GvifmCommandEchoerr: GvifmCommand
+public class GfmimCommandEchoerr: GfmimCommand
 {
-    public GvifmCommandEchoerr(GvifmWindow window)
+    public GfmimCommandEchoerr(GfmimWindow window)
     {
         this.name    = "echoe[rr]";
-        this._num_args  = GvifmCommandNargs.SINGLE;
+        this._num_args  = GfmimCommandNargs.SINGLE;
         this._parent    = window;
     }
 
-    public override int perform(bool bang = false, GvifmRange? range = null, string args = "") throws GvifmCommandError
+    public override int perform(bool bang = false, GfmimRange? range = null, string args = "") throws GfmimCommandError
     {
         if (this.check(bang, range)) {
             this._parent.statusbar.show_error(this.parse_args(args)[0]);
@@ -175,16 +175,16 @@ public class GvifmCommandEchoerr: GvifmCommand
 
 }
 
-public class GvifmCommandEcho : GvifmCommand
+public class GfmimCommandEcho : GfmimCommand
 {
-    public GvifmCommandEcho(GvifmWindow window)
+    public GfmimCommandEcho(GfmimWindow window)
     {
         this._parent = window;
-        this._num_args = GvifmCommandNargs.SINGLE;
+        this._num_args = GfmimCommandNargs.SINGLE;
         this.name = "ec[ho]";
     }
 
-    public override int perform(bool bang = false, GvifmRange? range = null, string args = "") throws GvifmCommandError
+    public override int perform(bool bang = false, GfmimRange? range = null, string args = "") throws GfmimCommandError
     {
         if (this.check(bang, range))
         {
@@ -194,16 +194,16 @@ public class GvifmCommandEcho : GvifmCommand
     }
 }
 
-public class GvifmCommandQuit : GvifmCommand
+public class GfmimCommandQuit : GfmimCommand
 {
-    public GvifmCommandQuit(GvifmWindow window)
+    public GfmimCommandQuit(GfmimWindow window)
     {
         this._parent = window;
         this._has_bang = true;
         this.name = "q[uit]";
     }
 
-    public override int perform(bool bang = false, GvifmRange? range = null, string args = "") throws GvifmCommandError
+    public override int perform(bool bang = false, GfmimRange? range = null, string args = "") throws GfmimCommandError
     {
         if (this.check(bang, range))
         {
@@ -218,21 +218,21 @@ public class GvifmCommandQuit : GvifmCommand
 
 // Commands collection {{{2
 
-public class GvifmCommands
+public class GfmimCommands
 {
-    private GLib.List<GvifmCommand> list;
+    private GLib.List<GfmimCommand> list;
 
-    public GvifmCommands(GvifmWindow window)
+    public GfmimCommands(GfmimWindow window)
     {
-        list = new GLib.List<GvifmCommand>();
-        list.append(new GvifmCommandQuit(window));
-        list.append(new GvifmCommandEcho(window));
-        list.append(new GvifmCommandEchoerr(window));
+        list = new GLib.List<GfmimCommand>();
+        list.append(new GfmimCommandQuit(window));
+        list.append(new GfmimCommandEcho(window));
+        list.append(new GfmimCommandEchoerr(window));
     }
 
-    public GvifmCommand find_command(string name) throws GvifmCommandError.NotFound
+    public GfmimCommand find_command(string name) throws GfmimCommandError.NotFound
     {
-        foreach (GvifmCommand cmd in this.list)
+        foreach (GfmimCommand cmd in this.list)
         {
             stderr.printf("test cmd: %s\n", cmd.fullname);
             if (cmd.match_name(name))
@@ -240,10 +240,10 @@ public class GvifmCommands
                 return cmd;
             }
         }
-        throw new GvifmCommandError.NotFound("E492: command not found: %s".printf(name));
+        throw new GfmimCommandError.NotFound("E492: command not found: %s".printf(name));
     }
 
-    public int execute(string command) throws GvifmCommandError
+    public int execute(string command) throws GfmimCommandError
     {
         try {
             var re = new Regex("^(?:(\\.|(?:\\.[+-])?[0-9]+|'[a-z<>])(?:,((?:\\.[+-])?[0-9]+|'[a-z<>]))?)?([A-Za-z][A-Za-z0-9_]*)(\\!)?\\s*");
@@ -254,13 +254,13 @@ public class GvifmCommands
 
                 string name       = match[3];
                 bool bang         = match[4] == "!";
-                GvifmRange? range = null;
+                GfmimRange? range = null;
                 string args       = "";
 
                 stderr.printf("parsing: <%s>\n", match[3]);
 
                 if (match[1] != "" || match[2] != "") {
-                    range = GvifmRange();
+                    range = GfmimRange();
                     range.firstline = match[1];
                     range.lastline  = match[2];
                 }
@@ -275,12 +275,12 @@ public class GvifmCommands
         } catch (RegexError e) {
             stderr.printf("command regex error: %s\n", e.message);
         }
-        throw new GvifmCommandError.NotParseable("Error parsing command: %s\n".printf(command));
+        throw new GfmimCommandError.NotParseable("Error parsing command: %s\n".printf(command));
     }
 
-    public int perform(string name, bool? bang = null, GvifmRange? range = null, string? args = null) throws GvifmCommandError
+    public int perform(string name, bool? bang = null, GfmimRange? range = null, string? args = null) throws GfmimCommandError
     {
-        GvifmCommand cmd = this.find_command(name);
+        GfmimCommand cmd = this.find_command(name);
         stderr.printf("command found: %s -> %s\n", name, cmd.fullname);
         return cmd.perform(bang, range, args);
     }
@@ -292,26 +292,26 @@ public class GvifmCommands
 
 // Command & status lines {{{
 
-public class GvifmCommandLine : Gtk.Entry
+public class GfmimCommandLine : Gtk.Entry
 {
-    public GvifmCommandLine()
+    public GfmimCommandLine()
     {
         has_frame = false;
         hide();
     }
 }
 
-public class GvifmStatusbar : Gtk.HBox
+public class GfmimStatusbar : Gtk.HBox
 {
     public Gtk.Label message;
-    public GvifmCommandLine command_line;
+    public GfmimCommandLine command_line;
 
-    public GvifmStatusbar()
+    public GfmimStatusbar()
     {
         /*has_resize_grip = false;*/
         message = new Gtk.Label("");
         message.use_markup = true;
-        command_line = new GvifmCommandLine();
+        command_line = new GfmimCommandLine();
         command_line.focus_out_event.connect((src, ev) => { this.message.label = ""; return false; });
         pack_start(message, false, false, 0);
         pack_start(command_line, true, true, 0);
@@ -351,9 +351,9 @@ public class GvifmStatusbar : Gtk.HBox
 
 // Mappings {{{
 
-public class GvifmMapping
+public class GfmimMapping
 {
-    public GvifmMapping(string keyname)
+    public GfmimMapping(string keyname)
     {
         _keyname = keyname;
     }
@@ -374,34 +374,34 @@ public class GvifmMapping
     /*public delegate int perform(int count = 0);*/
 }
 
-public class GvifmMappings
+public class GfmimMappings
 {
-    private GLib.List<GvifmMapping> list;
+    private GLib.List<GfmimMapping> list;
 
-    public GvifmMappings(GvifmWindow window)
+    public GfmimMappings(GfmimWindow window)
     {
-        GvifmMapping map;
-        list = new GLib.List<GvifmMapping>();
+        GfmimMapping map;
+        list = new GLib.List<GfmimMapping>();
 
-        map = new GvifmMapping("colon");
-        map.activate.connect((c) => { window.change_mode(GvifmMode.COMMAND); return 1; });
+        map = new GfmimMapping("colon");
+        map.activate.connect((c) => { window.change_mode(GfmimMode.COMMAND); return 1; });
         list.append(map);
 
-        map = new GvifmMapping("Q");
+        map = new GfmimMapping("Q");
         map.activate.connect((c) => { window.execute_command("quit"); return 1; });
         list.append(map);
     }
 
-    /*public static GvifmMapping make_mapping(string keyname, GvifmMapping.perform perform)*/
+    /*public static GfmimMapping make_mapping(string keyname, GfmimMapping.perform perform)*/
     /*{*/
-        /*var result = new GvifmMapping(keyname);*/
+        /*var result = new GfmimMapping(keyname);*/
         /*result.activate.connect(perform);*/
         /*return result;*/
     /*}*/
 
-    public GvifmMapping? find_mapping(Gdk.EventKey key)
+    public GfmimMapping? find_mapping(Gdk.EventKey key)
     {
-        foreach (GvifmMapping map in this.list)
+        foreach (GfmimMapping map in this.list)
         {
             if (map.match_key(key))
             {
@@ -413,7 +413,7 @@ public class GvifmMappings
 
     public int execute(Gdk.EventKey key)
     {
-        GvifmMapping map = this.find_mapping(key);
+        GfmimMapping map = this.find_mapping(key);
         if (map != null) return map.activate(0);
         return 0;
     }
@@ -421,7 +421,7 @@ public class GvifmMappings
 
 // }}}
 
-public enum GvifmMode
+public enum GfmimMode
 {
     NORMAL,
     COMMAND,
@@ -429,15 +429,15 @@ public enum GvifmMode
     SEARCH,
 }
 
-public class GvifmFilesLoader
+public class GfmimFilesLoader
 {
     private TreeIter? root_dir;
     private string root_dir_name;
-    private GvifmFilesStore tree_store;
+    private GfmimFilesStore tree_store;
 
-    private GLib.List<GvifmFilesLoader> subloaders;
+    private GLib.List<GfmimFilesLoader> subloaders;
 
-    public GvifmFilesLoader(string dirname, GvifmFilesStore store)
+    public GfmimFilesLoader(string dirname, GfmimFilesStore store)
     {
         store.append(out root_dir, null);
         store.set(root_dir, 0, dirname);
@@ -446,7 +446,7 @@ public class GvifmFilesLoader
         root_dir_name = dirname;
     }
 
-    public GvifmFilesLoader.from_iter(TreeIter root, string dirname, GvifmFilesStore store)
+    public GfmimFilesLoader.from_iter(TreeIter root, string dirname, GfmimFilesStore store)
     {
         tree_store = store;
         root_dir = root;
@@ -479,7 +479,7 @@ public class GvifmFilesLoader
                 if (finfo.get_file_type() == GLib.FileType.DIRECTORY)
                 {
                     /*stderr.printf("dir: %s\n", finfo.get_name());*/
-                    var subloader = new GvifmFilesLoader.from_iter(item, this.root_dir_name + "/" + finfo.get_name(), this.tree_store);
+                    var subloader = new GfmimFilesLoader.from_iter(item, this.root_dir_name + "/" + finfo.get_name(), this.tree_store);
                     this.subloaders.append(subloader);
                     subloader.load_dir();
                 }
@@ -488,11 +488,11 @@ public class GvifmFilesLoader
     }
 }
 
-public class GvifmFilesStore : Gtk.TreeStore
+public class GfmimFilesStore : Gtk.TreeStore
 {
-    private GvifmFilesLoader loader;
+    private GfmimFilesLoader loader;
 
-    public GvifmFilesStore()
+    public GfmimFilesStore()
     {
         GLib.Type[] types = { typeof(string) };
         set_column_types(types);
@@ -500,16 +500,16 @@ public class GvifmFilesStore : Gtk.TreeStore
 
     public void load_dir(string dirname)
     {
-        this.loader = new GvifmFilesLoader(dirname, this);
+        this.loader = new GfmimFilesLoader(dirname, this);
         this.loader.load_dir();
     }
 }
 
-public class GvifmTreeView : Gtk.IconView//Gtk.TreeView
+public class GfmimTreeView : Gtk.IconView//Gtk.TreeView
 {
     public ScrolledWindow scroller { get; private set; }
 
-    public GvifmTreeView(GvifmFilesStore model)
+    public GfmimTreeView(GfmimFilesStore model)
     {
         set_model(model);
         /*insert_column_with_attributes(-1, "Filename", new CellRendererText(), "text", 0);*/
@@ -521,7 +521,7 @@ public class GvifmTreeView : Gtk.IconView//Gtk.TreeView
 
 }
 
-public class GvifmWindow : Gtk.Window
+public class GfmimWindow : Gtk.Window
 {
     [CCode (instance_pos=-1)]
     public bool normal_key_press_handler(Widget source, Gdk.EventKey key)
@@ -539,24 +539,24 @@ public class GvifmWindow : Gtk.Window
         if (key.keyval == 65293)
         {
             string cmd = this.statusbar.get_command_line();
-            this.change_mode(GvifmMode.NORMAL);
+            this.change_mode(GfmimMode.NORMAL);
             this.execute_command(cmd);
             return true;
         }
         return false;
     }
 
-    public void change_mode(GvifmMode newmode)
+    public void change_mode(GfmimMode newmode)
     {
         this.mode = newmode;
         switch (newmode)
         {
-            case GvifmMode.NORMAL:
+            case GfmimMode.NORMAL:
                 this.statusbar.close_command_line();
                 this.key_press_event.disconnect(command_key_press_handler);
                 this.key_press_event.connect(normal_key_press_handler);
             break;
-            case GvifmMode.COMMAND:
+            case GfmimMode.COMMAND:
                 this.key_press_event.disconnect(normal_key_press_handler);
                 this.key_press_event.connect(command_key_press_handler);
                 this.statusbar.open_command_line(":");
@@ -566,13 +566,13 @@ public class GvifmWindow : Gtk.Window
         }
     }
 
-    private GvifmMode mode = GvifmMode.NORMAL;
-    public GvifmStatusbar statusbar;
-    private GvifmCommands commands;
-    private GvifmMappings mappings;
+    private GfmimMode mode = GfmimMode.NORMAL;
+    public GfmimStatusbar statusbar;
+    private GfmimCommands commands;
+    private GfmimMappings mappings;
 
-    private GvifmFilesStore fs_store;
-    private GvifmTreeView fs_tree;
+    private GfmimFilesStore fs_store;
+    private GfmimTreeView fs_tree;
 
     private enum FsColumns
     {
@@ -581,16 +581,16 @@ public class GvifmWindow : Gtk.Window
         NCOLS
     }
 
-    public GvifmWindow()
+    public GfmimWindow()
     {
-        this.title = "GVifm";
+        this.title = "Gfmim";
         this.destroy.connect(Gtk.main_quit);
 
-        statusbar = new GvifmStatusbar();
-        statusbar.command_line.focus_out_event.connect((src, ev) => { this.change_mode(GvifmMode.NORMAL); return false; });
+        statusbar = new GfmimStatusbar();
+        statusbar.command_line.focus_out_event.connect((src, ev) => { this.change_mode(GfmimMode.NORMAL); return false; });
 
-        fs_store = new GvifmFilesStore();
-        fs_tree = new GvifmTreeView(fs_store);
+        fs_store = new GfmimFilesStore();
+        fs_tree = new GfmimTreeView(fs_store);
 
         var vbox = new VBox(false, 0);
         /*vbox.pack_start();*/
@@ -598,9 +598,9 @@ public class GvifmWindow : Gtk.Window
         vbox.pack_start(statusbar, false, false, 0);
         add(vbox);
 
-        commands = new GvifmCommands(this);
-        mappings = new GvifmMappings(this);
-        change_mode(GvifmMode.NORMAL);
+        commands = new GfmimCommands(this);
+        mappings = new GfmimMappings(this);
+        change_mode(GfmimMode.NORMAL);
 
         fs_store.load_dir("/home/kstep/doc");
     }
@@ -609,7 +609,7 @@ public class GvifmWindow : Gtk.Window
     {
         try {
             return this.commands.execute(command);
-        } catch (GvifmCommandError e) {
+        } catch (GfmimCommandError e) {
             this.statusbar.show_error(e.message);
         }
         return 0;
@@ -618,7 +618,7 @@ public class GvifmWindow : Gtk.Window
     public static int main(string[] args)
     {
         Gtk.init(ref args);
-        var window = new GvifmWindow();
+        var window = new GfmimWindow();
         window.destroy.connect(Gtk.main_quit);
         window.show_all();
         Gtk.main();
