@@ -362,7 +362,7 @@ public class GfmimMapping
         return this._keycode == key.keyval || Gdk.keyval_name(key.keyval) == this._keyname;
     }
 
-    public signal void activate(Gtk.Window source, int count = 0);
+    public signal void activate (Gtk.Window source, int count = 0);
 }
 
 public class GfmimMappings
@@ -371,24 +371,19 @@ public class GfmimMappings
 
     public GfmimMappings()
     {
-        GfmimMapping map;
         list = new GLib.List<GfmimMapping>();
 
-        map = new GfmimMapping("colon", true);
-        map.activate.connect((s, c) => { (s as GfmimWindow).change_mode(GfmimMode.COMMAND); });
-        list.append(map);
-
-        map = new GfmimMapping("Z", true);
-        map.activate.connect((s, c) => { (s as GfmimWindow).execute_command("quit"); });
-        list.append(map);
+        this.add_mapping("colon").activate.connect((s, c) => { (s as GfmimWindow).change_mode(GfmimMode.COMMAND); });
+        this.add_mapping("Z").activate.connect((s, c) => { (s as GfmimWindow).execute_command("quit"); });
+        this.add_mapping("/").activate.connect((s, c) => { (s as GfmimWindow).change_mode(GfmimMode.SEARCH); });
     }
 
-    /*public static GfmimMapping make_mapping(string keyname, GfmimMapping.perform perform)*/
-    /*{*/
-        /*var result = new GfmimMapping(keyname);*/
-        /*result.activate.connect(perform);*/
-        /*return result;*/
-    /*}*/
+    public GfmimMapping add_mapping(string keyname)
+    {
+        var map = new GfmimMapping(keyname, true);
+        this.list.append(map);
+        return map;
+    }
 
     public GfmimMapping? find_mapping(Gdk.EventKey key)
     {
