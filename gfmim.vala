@@ -328,11 +328,13 @@ public class GfmimStatusbar : Gtk.HBox
 
 public class GfmimMapping
 {
-    public GfmimMapping(string keyname)
+    public GfmimMapping(string keyname, bool system = false)
     {
         _keyname = keyname;
+        _system = system;
     }
 
+    private bool _system = false;
     private string _keyname = "";
     private uint _keycode   = 0;
     private string _keystr  = "";
@@ -357,11 +359,11 @@ public class GfmimMappings
         GfmimMapping map;
         list = new GLib.List<GfmimMapping>();
 
-        map = new GfmimMapping("colon");
+        map = new GfmimMapping("colon", true);
         map.activate.connect((s, c) => { (s as GfmimWindow).change_mode(GfmimMode.COMMAND); });
         list.append(map);
 
-        map = new GfmimMapping("Q");
+        map = new GfmimMapping("Z", true);
         map.activate.connect((s, c) => { (s as GfmimWindow).execute_command("quit"); });
         list.append(map);
     }
