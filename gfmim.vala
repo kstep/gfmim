@@ -516,7 +516,8 @@ public class GfmimWindow : Gtk.Window
         {
             string cmd = this.statusbar.get_command_line();
             this.change_mode(GfmimMode.NORMAL);
-            this.execute_command(cmd);
+            if (cmd != "")
+                this.execute_command(cmd);
             return true;
         }
         return false;
