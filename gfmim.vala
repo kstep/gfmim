@@ -33,7 +33,7 @@ public class GfmimCommandParser
 {
     public string name;
     public bool bang;
-    public int count;
+    public uint count;
     public GfmimCommandRange? range;
     public string argline;
     public string[] args;
@@ -332,16 +332,51 @@ public class GfmimStatusbar : Gtk.HBox
 
 public class GfmimMapping
 {
-    public GfmimMapping(string keyname, bool system = false)
+    private bool _system = false;
+    private string _keyname = "";
+    private uint[] _keyseq = {};
+
+    public GfmimMapping(string key, bool system = false)
     {
-        _keyname = keyname;
+        keyname = key;
         _system = system;
     }
 
-    private bool _system = false;
-    private string _keyname = "";
-    private uint _keycode   = 0;
-    private string _keystr  = "";
+    public string keyname {
+        get { return _keyname; }
+        protected set {
+            _keyname = value;
+            _keyseq = {};
+            int inkey = 0;
+            var composed_key = new StringBuilder();
+            for (int i = 0; i < _keyname.len(); i++)
+            {
+                unichar c = _keyname[i];
+                if (c == '<') {
+                    inkey++;
+                    if (inkey == 1)
+                        continue;
+                } else if (c == '>' && inkey > 0) {
+                    inkey--;
+                    if (inkey == 0 && composed_key.str != "")
+                    {
+                        _keyseq += Gdk.keyval_from_name(composed_key.str);
+                        composed_key.str = "";
+                        continue;
+                    }
+                }
+
+                if (inkey > 0)
+                {
+                    composed_key.append_unichar(c);
+                }
+                else
+                {
+                    _keyseq += Gdk.unicode_to_keyval(c);
+                }
+            }
+        }
+    }
 
     /**
     1. разбить на keyname на последовательность символов:
@@ -354,15 +389,19 @@ public class GfmimMapping
     <S-> => 1,
     <T-> => 67108928.
     */
-    public bool match_key(Gdk.EventKey key)
+    public bool match_key(uint[] key)
+    requires (key.length > 0)
     {
-        stderr.printf("that key: %u, %s, %s\n", key.keyval, key.str, Gdk.keyval_name(key.keyval));
-        stderr.printf("this key: %u, %s, %s\n", this._keycode, this._keystr, this._keyname);
+        stderr.printf("that key: %u\n", key[0]);
+        stderr.printf("this key: %u\n", this._keyseq[0]);
         /*return this._keycode == key.keyval || this._keystr == key.str || Gdk.keyval_name(key.keyval) == this._keyname;*/
-        return this._keycode == key.keyval || Gdk.keyval_name(key.keyval) == this._keyname;
+        if (key.length != this._keyseq.length) return false;
+        for (int i = 0; i < key.length; i++)
+            if (key[i] != this._keyseq[i]) return false;
+        return true;
     }
 
-    public signal void activate (Gtk.Window source, int count = 0);
+    public signal void activate (Gtk.Window source, uint count = 0);
 }
 
 public class GfmimMappings
@@ -373,8 +412,8 @@ public class GfmimMappings
     {
         list = new GLib.List<GfmimMapping>();
 
-        this.add_mapping("colon").activate.connect((s, c) => { (s as GfmimWindow).change_mode(GfmimMode.COMMAND); });
-        this.add_mapping("Z").activate.connect((s, c) => { (s as GfmimWindow).execute_command("quit"); });
+        this.add_mapping("<colon>").activate.connect((s, c) => { (s as GfmimWindow).change_mode(GfmimMode.COMMAND); });
+        this.add_mapping("ZZ").activate.connect((s, c) => { (s as GfmimWindow).execute_command("quit"); });
         this.add_mapping("/").activate.connect((s, c) => { (s as GfmimWindow).change_mode(GfmimMode.SEARCH); });
     }
 
@@ -385,13 +424,42 @@ public class GfmimMappings
         return map;
     }
 
+    uint[] key_buffer;
+    uint32 key_timeout;
+    uint key_count;
     public GfmimMapping? find_mapping(Gdk.EventKey key)
     {
-        foreach (GfmimMapping map in this.list)
+        // сброс по таймауту
+        if ((key.time - this.key_timeout) > 1000)
         {
-            if (map.match_key(key))
+            this.key_buffer = {};
+            this.key_count = 0;
+        }
+        this.key_timeout = key.time;
+
+        // безусловный сброс по Esc
+        if (key.keyval == 65307)
+        {
+            this.key_buffer = {};
+            this.key_count = 0;
+        }
+        // увеличение параметра count
+        else if ((key.state == 0) && (47 < key.keyval) && (key.keyval < 58))
+        {
+            this.key_count *= 10;
+            this.key_count += key.keyval - 48;
+        }
+        // обычная клавиша
+        else
+        {
+            this.key_buffer += key.keyval;
+            foreach (GfmimMapping map in this.list)
             {
-                return map;
+                if (map.match_key(this.key_buffer))
+                {
+                    this.key_buffer = {};
+                    return map;
+                }
             }
         }
         return null;
@@ -400,7 +468,7 @@ public class GfmimMappings
     public void execute(Gtk.Window source, Gdk.EventKey key)
     {
         GfmimMapping map = this.find_mapping(key);
-        if (map != null) map.activate(source, 0);
+        if (map != null) map.activate(source, this.key_count);
     }
 }
 
