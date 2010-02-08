@@ -556,6 +556,11 @@ public class GfmimWindow : Gtk.Window
                 this.key_press_event.connect(command_key_press_handler);
                 this.statusbar.open_command_line(":");
             break;
+            case GfmimMode.SEARCH:
+                this.key_press_event.disconnect(normal_key_press_handler);
+                this.key_press_event.connect(command_key_press_handler);
+                this.statusbar.open_command_line("/");
+            break;
             default:
             break;
         }
