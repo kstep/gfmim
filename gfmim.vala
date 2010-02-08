@@ -52,7 +52,7 @@ public class GfmimCommandParser
                 bang = match[5] == "!";
                 argline = "";
 
-                stderr.printf("parsing: <%s>\n", match[3]);
+                stderr.printf("parsing: <%s>\n", match[4]);
 
                 if (match[1] != "" || match[2] != "") {
                     range = GfmimCommandRange();
@@ -66,7 +66,6 @@ public class GfmimCommandParser
                 return;
             }
         } catch (RegexError e) {
-            stderr.printf("command regex error: %s\n", e.message);
         }
         throw new GfmimCommandError.NotParseable("Error parsing command: %s\n".printf(command));
     }
@@ -339,6 +338,17 @@ public class GfmimMapping
     private uint _keycode   = 0;
     private string _keystr  = "";
 
+    /**
+    1. разбить на keyname на последовательность символов:
+    1.1. просто символ означает конкретную нажатую клавишу, сравнивается с key.str,
+    1.2. части строки, заключённые в <> воспринимаются как один символ, сравниваются с Gdk.keyval_name(key.keyval),
+    при это учитывается состояние модификаторов, если они есть.
+    маски модификаторов:
+    <C-> => 4,
+    <M-> => 8,
+    <S-> => 1,
+    <T-> => 67108928.
+    */
     public bool match_key(Gdk.EventKey key)
     {
         stderr.printf("that key: %u, %s, %s\n", key.keyval, key.str, Gdk.keyval_name(key.keyval));
@@ -503,6 +513,7 @@ public class GfmimWindow : Gtk.Window
     [CCode (instance_pos=-1)]
     public bool normal_key_press_handler(Widget source, Gdk.EventKey key)
     {
+        stderr.printf("key: s=%u, mod=%u, val=%u, str=%s, name=%s, hk=%u\n", key.state, key.is_modifier, key.keyval, key.str, Gdk.keyval_name(key.keyval), key.hardware_keycode);
         if (key.is_modifier == 0)
         {
             this.mappings.execute(this, key);
