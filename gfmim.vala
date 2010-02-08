@@ -14,7 +14,7 @@ errordomain GfmimCommandError
     NoRangeAllowed,
 }
 
-public struct GfmimRange
+public struct GfmimCommandRange
 {
     string firstline;
     string lastline;
@@ -29,33 +29,46 @@ public enum GfmimCommandNargs
     MANY,   // +
 }
 
-public abstract class GfmimCommand
+public class GfmimCommandParser
 {
-    protected string _name      = "";
-    protected string _shortname = "";
-    protected string _fullname  = "";
+    public string name;
+    public bool bang;
+    public int count;
+    public GfmimCommandRange? range;
+    public string argline;
+    public string[] args;
 
-    protected bool _has_bang  = false;
-    protected bool _has_range = false;
-    protected GfmimCommandNargs _num_args = GfmimCommandNargs.NONE;
-    protected int _def_count = -1;
-    protected GfmimWindow _parent;
+    public GfmimCommandParser(string command) throws GfmimCommandError
+    {
+        try {
+            // 1,2 => range, 3 => count, 4 => name, 5 => bang, the rest is args
+            var re = new Regex("^(?:(\\.|(?:\\.[+-])?[0-9]+|'[a-z<>])(?:,((?:\\.[+-])?[0-9]+|'[a-z<>]))?|([0-9]+))?([A-Za-z][A-Za-z0-9_]*)(\\!)?\\s*");
+            MatchInfo matches;
+            if (re.match(command, 0, out matches))
+            {
+                string[] match = matches.fetch_all();
 
-    public string shortname { get { return _shortname; } }
-    public string fullname { get { return _fullname; } }
+                name = match[4];
+                bang = match[5] == "!";
+                argline = "";
 
-    public string name {
-        get { return _name; }
-        protected set {
-            _name = value;
-            string? part = _name.str("[");
-            if (part == null) {
-                _fullname = _shortname = _name;
-            } else {
-                _shortname = _name.substring(0, _name.len()-part.len());
-                _fullname  = _shortname + part.substring(1, part.len()-2);
+                stderr.printf("parsing: <%s>\n", match[3]);
+
+                if (match[1] != "" || match[2] != "") {
+                    range = GfmimCommandRange();
+                    range.firstline = match[1];
+                    range.lastline  = match[2];
+                } else if (match[3] != "") {
+                    count = match[3].to_int();
+                }
+                if (match[0].len() < command.len())
+                    argline = command.substring(match[0].len());
+                return;
             }
+        } catch (RegexError e) {
+            stderr.printf("command regex error: %s\n", e.message);
         }
+        throw new GfmimCommandError.NotParseable("Error parsing command: %s\n".printf(command));
     }
 
     private string[] split_string(string args)
@@ -96,48 +109,69 @@ public abstract class GfmimCommand
         return result;
     }
 
-    public string[] parse_args(string args) throws GfmimCommandError.TrailingChars, GfmimCommandError.ArgRequired
+    public void parse_args(GfmimCommandNargs num_args) throws GfmimCommandError.TrailingChars, GfmimCommandError.ArgRequired
     {
-        string[] result = {};
-        switch (this._num_args)
+        this.args = {};
+        switch (num_args)
         {
         case GfmimCommandNargs.NONE: 
-            if (args.len() > 0)
+            if (this.argline.len() > 0)
                 throw new GfmimCommandError.TrailingChars("E488: trailing characters");
             break;
         case GfmimCommandNargs.SINGLE:
         case GfmimCommandNargs.MANY:
-            if (args.len() < 1)
+            if (this.argline.len() < 1)
                 throw new GfmimCommandError.ArgRequired("E475: argument required");
-            if (this._num_args == GfmimCommandNargs.MANY)
-                result = this.split_string(args);
+            if (num_args == GfmimCommandNargs.MANY)
+                this.args = this.split_string(this.argline);
             else
-                result = { args };
+                this.args = { this.argline };
             break;
         case GfmimCommandNargs.ANY:
-            result = this.split_string(args);
+            this.args = this.split_string(this.argline);
             break;
         case GfmimCommandNargs.ONE:
-            if (args.len() > 0)
-                result = { args };
+            if (this.argline.len() > 0)
+                this.args = { this.argline };
             break;
         default:
             break;
         }
-        return result;
+    }
+}
+
+public class GfmimCommand
+{
+    protected string _name      = "";
+    protected string _shortname = "";
+    protected string _fullname  = "";
+
+    protected bool _has_bang  = false;
+    protected bool _has_range = false;
+    protected GfmimCommandNargs _num_args = GfmimCommandNargs.NONE;
+    protected int _def_count = -1;
+
+    public string shortname { get { return _shortname; } }
+    public string fullname { get { return _fullname; } }
+
+    public string name {
+        get { return _name; }
+        protected set {
+            _name = value;
+            string? part = _name.str("[");
+            if (part == null) {
+                _fullname = _shortname = _name;
+            } else {
+                _shortname = _name.substring(0, _name.len()-part.len());
+                _fullname  = _shortname + part.substring(1, part.len()-2);
+            }
+        }
     }
 
-    public bool check(bool bang = false, GfmimRange? range = null) throws GfmimCommandError.NoBangAllowed, GfmimCommandError.NoRangeAllowed
+    public bool check(GfmimCommandParser parser) throws GfmimCommandError.NoBangAllowed, GfmimCommandError.NoRangeAllowed
     {
-        if (bang && !this._has_bang) throw new GfmimCommandError.NoBangAllowed("E477: ! is not allowed");
-        if (range != null && !this._has_range) throw new GfmimCommandError.NoRangeAllowed("E481: no range allowed");
-        /*int ln = args.length;*/
-        /*if ((ln == 0 && this._num_args == GfmimCommandNargs.NONE)*/
-            /*|| (ln == 1 && this._num_args == GfmimCommandNargs.SINGLE)*/
-            /*|| (ln >= 0 && this._num_args == GfmimCommandNargs.ANY)*/
-            /*|| (ln >= 1 && this._num_args == GfmimCommandNargs.MANY)*/
-            /*|| (0 <= ln && ln <= 1 && this._num_args == GfmimCommandNargs.ONE))*/
-        /*{} else throw new GfmimCommandError.Incorrect("E474: invalid argument");*/
+        if (parser.bang && !this._has_bang) throw new GfmimCommandError.NoBangAllowed("E477: ! is not allowed");
+        if (parser.range != null && !this._has_range) throw new GfmimCommandError.NoRangeAllowed("E481: no range allowed");
         return true;
     }
 
@@ -146,11 +180,15 @@ public abstract class GfmimCommand
         return name.len() >= this._shortname.len() && this._fullname.has_prefix(name);
     }
 
-    public virtual int perform(bool bang = false, GfmimRange? range = null, string args = "") throws GfmimCommandError
+    public virtual int execute(Gtk.Widget source, GfmimCommandParser parser) throws GfmimCommandError
     {
-        stderr.printf("oops!\n");
+        parser.parse_args(this._num_args);
+        if (this.check(parser))
+            return this.activate(source, parser);
         return 0;
     }
+
+    public signal int activate(Gtk.Widget source, GfmimCommandParser parser);
 }
 // 2}}}
 
@@ -158,59 +196,31 @@ public abstract class GfmimCommand
 
 public class GfmimCommandEchoerr: GfmimCommand
 {
-    public GfmimCommandEchoerr(GfmimWindow window)
+    public GfmimCommandEchoerr()
     {
         this.name    = "echoe[rr]";
         this._num_args  = GfmimCommandNargs.SINGLE;
-        this._parent    = window;
+        this.activate.connect((s, p) => { (s as GfmimWindow).statusbar.show_error(p.args[0]); });
     }
-
-    public override int perform(bool bang = false, GfmimRange? range = null, string args = "") throws GfmimCommandError
-    {
-        if (this.check(bang, range)) {
-            this._parent.statusbar.show_error(this.parse_args(args)[0]);
-        }
-        return 0;
-    }
-
 }
 
 public class GfmimCommandEcho : GfmimCommand
 {
-    public GfmimCommandEcho(GfmimWindow window)
+    public GfmimCommandEcho()
     {
-        this._parent = window;
         this._num_args = GfmimCommandNargs.SINGLE;
         this.name = "ec[ho]";
-    }
-
-    public override int perform(bool bang = false, GfmimRange? range = null, string args = "") throws GfmimCommandError
-    {
-        if (this.check(bang, range))
-        {
-            this._parent.statusbar.show_message(this.parse_args(args)[0]);
-        }
-        return 0;
+        this.activate.connect((s, p) => { (s as GfmimWindow).statusbar.show_message(p.args[0]); });
     }
 }
 
 public class GfmimCommandQuit : GfmimCommand
 {
-    public GfmimCommandQuit(GfmimWindow window)
+    public GfmimCommandQuit()
     {
-        this._parent = window;
         this._has_bang = true;
         this.name = "q[uit]";
-    }
-
-    public override int perform(bool bang = false, GfmimRange? range = null, string args = "") throws GfmimCommandError
-    {
-        if (this.check(bang, range))
-        {
-            this.parse_args(args);
-            this._parent.destroy();
-        }
-        return 0;
+        this.activate.connect((s, p) => { s.destroy(); });
     }
 }
 
@@ -222,12 +232,12 @@ public class GfmimCommands
 {
     private GLib.List<GfmimCommand> list;
 
-    public GfmimCommands(GfmimWindow window)
+    public GfmimCommands()
     {
         list = new GLib.List<GfmimCommand>();
-        list.append(new GfmimCommandQuit(window));
-        list.append(new GfmimCommandEcho(window));
-        list.append(new GfmimCommandEchoerr(window));
+        list.append(new GfmimCommandQuit());
+        list.append(new GfmimCommandEcho());
+        list.append(new GfmimCommandEchoerr());
     }
 
     public GfmimCommand find_command(string name) throws GfmimCommandError.NotFound
@@ -243,46 +253,11 @@ public class GfmimCommands
         throw new GfmimCommandError.NotFound("E492: command not found: %s".printf(name));
     }
 
-    public int execute(string command) throws GfmimCommandError
+    public int execute(Gtk.Widget source, string command) throws GfmimCommandError
     {
-        try {
-            var re = new Regex("^(?:(\\.|(?:\\.[+-])?[0-9]+|'[a-z<>])(?:,((?:\\.[+-])?[0-9]+|'[a-z<>]))?)?([A-Za-z][A-Za-z0-9_]*)(\\!)?\\s*");
-            MatchInfo matches;
-            if (re.match(command, 0, out matches))
-            {
-                string[] match = matches.fetch_all();
-
-                string name       = match[3];
-                bool bang         = match[4] == "!";
-                GfmimRange? range = null;
-                string args       = "";
-
-                stderr.printf("parsing: <%s>\n", match[3]);
-
-                if (match[1] != "" || match[2] != "") {
-                    range = GfmimRange();
-                    range.firstline = match[1];
-                    range.lastline  = match[2];
-                }
-                if (match[0].len() < command.len())
-                    args = command.substring(match[0].len());
-                return this.perform(name, bang, range, args);
-            }
-            else
-            {
-                stderr.printf("error parsing command\n");
-            }
-        } catch (RegexError e) {
-            stderr.printf("command regex error: %s\n", e.message);
-        }
-        throw new GfmimCommandError.NotParseable("Error parsing command: %s\n".printf(command));
-    }
-
-    public int perform(string name, bool? bang = null, GfmimRange? range = null, string? args = null) throws GfmimCommandError
-    {
-        GfmimCommand cmd = this.find_command(name);
-        stderr.printf("command found: %s -> %s\n", name, cmd.fullname);
-        return cmd.perform(bang, range, args);
+        var parser = new GfmimCommandParser(command);
+        GfmimCommand cmd = this.find_command(parser.name);
+        return cmd.execute(source, parser);
     }
 }
 
@@ -371,7 +346,6 @@ public class GfmimMapping
     }
 
     public signal int activate(int count = 0);
-    /*public delegate int perform(int count = 0);*/
 }
 
 public class GfmimMappings
@@ -429,6 +403,7 @@ public enum GfmimMode
     SEARCH,
 }
 
+// Files tree storage {{{
 public class GfmimFilesLoader
 {
     private TreeIter? root_dir;
@@ -504,15 +479,16 @@ public class GfmimFilesStore : Gtk.TreeStore
         this.loader.load_dir();
     }
 }
+// }}}
 
-public class GfmimTreeView : Gtk.IconView//Gtk.TreeView
+public class GfmimTreeView : Gtk.TreeView
 {
     public ScrolledWindow scroller { get; private set; }
 
     public GfmimTreeView(GfmimFilesStore model)
     {
         set_model(model);
-        /*insert_column_with_attributes(-1, "Filename", new CellRendererText(), "text", 0);*/
+        insert_column_with_attributes(-1, "Filename", new CellRendererText(), "text", 0);
 
         scroller = new ScrolledWindow(null, null);
         scroller.set_policy(PolicyType.NEVER, PolicyType.AUTOMATIC);
@@ -598,7 +574,7 @@ public class GfmimWindow : Gtk.Window
         vbox.pack_start(statusbar, false, false, 0);
         add(vbox);
 
-        commands = new GfmimCommands(this);
+        commands = new GfmimCommands();
         mappings = new GfmimMappings(this);
         change_mode(GfmimMode.NORMAL);
 
@@ -608,7 +584,7 @@ public class GfmimWindow : Gtk.Window
     public int execute_command(string command)
     {
         try {
-            return this.commands.execute(command);
+            return this.commands.execute(this, command);
         } catch (GfmimCommandError e) {
             this.statusbar.show_error(e.message);
         }
