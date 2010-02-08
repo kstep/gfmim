@@ -180,15 +180,15 @@ public class GfmimCommand
         return name.len() >= this._shortname.len() && this._fullname.has_prefix(name);
     }
 
-    public virtual int execute(Gtk.Widget source, GfmimCommandParser parser) throws GfmimCommandError
+    public virtual void execute(Gtk.Widget source, GfmimCommandParser parser) throws GfmimCommandError
     {
         parser.parse_args(this._num_args);
         if (this.check(parser))
-            return this.activate(source, parser);
-        return 0;
+            this.activate(source, parser);
+        return;
     }
 
-    public signal int activate(Gtk.Widget source, GfmimCommandParser parser);
+    public signal void activate(Gtk.Widget source, GfmimCommandParser parser);
 }
 // 2}}}
 
@@ -253,11 +253,11 @@ public class GfmimCommands
         throw new GfmimCommandError.NotFound("E492: command not found: %s".printf(name));
     }
 
-    public int execute(Gtk.Widget source, string command) throws GfmimCommandError
+    public void execute(Gtk.Widget source, string command) throws GfmimCommandError
     {
         var parser = new GfmimCommandParser(command);
         GfmimCommand cmd = this.find_command(parser.name);
-        return cmd.execute(source, parser);
+        cmd.execute(source, parser);
     }
 }
 
@@ -345,24 +345,24 @@ public class GfmimMapping
         return this._keycode == key.keyval || Gdk.keyval_name(key.keyval) == this._keyname;
     }
 
-    public signal int activate(int count = 0);
+    public signal void activate(Gtk.Window source, int count = 0);
 }
 
 public class GfmimMappings
 {
     private GLib.List<GfmimMapping> list;
 
-    public GfmimMappings(GfmimWindow window)
+    public GfmimMappings()
     {
         GfmimMapping map;
         list = new GLib.List<GfmimMapping>();
 
         map = new GfmimMapping("colon");
-        map.activate.connect((c) => { window.change_mode(GfmimMode.COMMAND); return 1; });
+        map.activate.connect((s, c) => { (s as GfmimWindow).change_mode(GfmimMode.COMMAND); });
         list.append(map);
 
         map = new GfmimMapping("Q");
-        map.activate.connect((c) => { window.execute_command("quit"); return 1; });
+        map.activate.connect((s, c) => { (s as GfmimWindow).execute_command("quit"); });
         list.append(map);
     }
 
@@ -385,11 +385,10 @@ public class GfmimMappings
         return null;
     }
 
-    public int execute(Gdk.EventKey key)
+    public void execute(Gtk.Window source, Gdk.EventKey key)
     {
         GfmimMapping map = this.find_mapping(key);
-        if (map != null) return map.activate(0);
-        return 0;
+        if (map != null) map.activate(source, 0);
     }
 }
 
@@ -504,7 +503,8 @@ public class GfmimWindow : Gtk.Window
     {
         if (key.is_modifier == 0)
         {
-            return this.mappings.execute(key) > 0;
+            this.mappings.execute(this, key);
+            return true;
         }
         return false;
     }
@@ -575,20 +575,20 @@ public class GfmimWindow : Gtk.Window
         add(vbox);
 
         commands = new GfmimCommands();
-        mappings = new GfmimMappings(this);
+        mappings = new GfmimMappings();
         change_mode(GfmimMode.NORMAL);
 
         fs_store.load_dir("/home/kstep/doc");
     }
 
-    public int execute_command(string command)
+    public void execute_command(string command)
     {
         try {
-            return this.commands.execute(this, command);
+            this.commands.execute(this, command);
         } catch (GfmimCommandError e) {
             this.statusbar.show_error(e.message);
         }
-        return 0;
+        return;
     }
 
     public static int main(string[] args)
