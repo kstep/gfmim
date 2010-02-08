@@ -515,29 +515,34 @@ public class GfmimFilesLoader
     private async void load_dir_async()
     {
         var dir = File.new_for_path(this.root_dir_name);
-        var list = yield dir.enumerate_children_async(
-            FILE_ATTRIBUTE_STANDARD_NAME +","
-            + FILE_ATTRIBUTE_STANDARD_TYPE,
-            0, Priority.DEFAULT, null);
-
-        while (true)
+        try
         {
-            var files = yield list.next_files_async(10, Priority.DEFAULT, null);
-            if (files == null) break;
-            foreach (var finfo in files)
+            var list = yield dir.enumerate_children_async(
+                FILE_ATTRIBUTE_STANDARD_NAME +","
+                + FILE_ATTRIBUTE_STANDARD_TYPE,
+                0, Priority.DEFAULT, null);
+
+            while (true)
             {
-                TreeIter item;
-                this.tree_store.append(out item, this.root_dir);
-                this.tree_store.set(item, 0, finfo.get_name());
-                /*stderr.printf("name: %s, type: %d, dirtype: %d\n", finfo.get_name(), finfo.get_file_type(), GLib.FileType.DIRECTORY);*/
-                if (finfo.get_file_type() == GLib.FileType.DIRECTORY)
+                var files = yield list.next_files_async(10, Priority.DEFAULT, null);
+                if (files == null) break;
+                foreach (var finfo in files)
                 {
-                    /*stderr.printf("dir: %s\n", finfo.get_name());*/
-                    var subloader = new GfmimFilesLoader.from_iter(item, this.root_dir_name + "/" + finfo.get_name(), this.tree_store);
-                    this.subloaders.append(subloader);
-                    subloader.load_dir();
+                    TreeIter item;
+                    this.tree_store.append(out item, this.root_dir);
+                    this.tree_store.set(item, 0, finfo.get_name());
+                    /*stderr.printf("name: %s, type: %d, dirtype: %d\n", finfo.get_name(), finfo.get_file_type(), GLib.FileType.DIRECTORY);*/
+                    if (finfo.get_file_type() == GLib.FileType.DIRECTORY)
+                    {
+                        /*stderr.printf("dir: %s\n", finfo.get_name());*/
+                        var subloader = new GfmimFilesLoader.from_iter(item, this.root_dir_name + "/" + finfo.get_name(), this.tree_store);
+                        this.subloaders.append(subloader);
+                        subloader.load_dir();
+                    }
                 }
             }
+        } catch (GLib.Error e) {
+            stderr.printf("Error loading directory content: %s\n", e.message);
         }
     }
 }
