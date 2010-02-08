@@ -149,6 +149,7 @@ public class GfmimCommand
     protected bool _has_range = false;
     protected GfmimCommandNargs _num_args = GfmimCommandNargs.NONE;
     protected int _def_count = -1;
+    protected bool _system = false;
 
     public string shortname { get { return _shortname; } }
     public string fullname { get { return _fullname; } }
@@ -198,6 +199,7 @@ public class GfmimCommandEchoerr: GfmimCommand
     public GfmimCommandEchoerr()
     {
         this.name    = "echoe[rr]";
+        this._system = true;
         this._num_args  = GfmimCommandNargs.SINGLE;
         this.activate.connect((s, p) => { (s as GfmimWindow).statusbar.show_error(p.args[0]); });
     }
@@ -207,8 +209,9 @@ public class GfmimCommandEcho : GfmimCommand
 {
     public GfmimCommandEcho()
     {
-        this._num_args = GfmimCommandNargs.SINGLE;
         this.name = "ec[ho]";
+        this._system = true;
+        this._num_args = GfmimCommandNargs.SINGLE;
         this.activate.connect((s, p) => { (s as GfmimWindow).statusbar.show_message(p.args[0]); });
     }
 }
@@ -217,8 +220,9 @@ public class GfmimCommandQuit : GfmimCommand
 {
     public GfmimCommandQuit()
     {
-        this._has_bang = true;
         this.name = "q[uit]";
+        this._system = true;
+        this._has_bang = true;
         this.activate.connect((s, p) => { s.destroy(); });
     }
 }
