@@ -91,7 +91,7 @@ public class GfmimCommandParser
                 {
                     str = false;
                     result += arg.str;
-                    arg.str = "";
+                    arg.truncate(0);
                 }
                 else
                 {
@@ -101,7 +101,7 @@ public class GfmimCommandParser
             else if (c == ' ')
             {
                 result += arg.str;
-                arg.str = "";
+                arg.truncate(0);
             }
             else arg.append_unichar(c);
         }
@@ -332,9 +332,12 @@ public class GfmimStatusbar : Gtk.HBox
 
 public class GfmimMapping
 {
+    public enum KeyMod { ANY = ~0, SHIFT = 1, CONTROL = 4, META = 8, SUPER = 67108928, ALL = 1|4|8|67108928 }
+
     private bool _system = false;
     private string _keyname = "";
     private uint[] _keyseq = {};
+    private uint[] _keymod = {};
 
     public GfmimMapping(string key, bool system = false)
     {
@@ -347,6 +350,8 @@ public class GfmimMapping
         protected set {
             _keyname = value;
             _keyseq = {};
+            _keymod = {};
+
             int inkey = 0;
             var composed_key = new StringBuilder();
             for (int i = 0; i < _keyname.len(); i++)
@@ -360,8 +365,38 @@ public class GfmimMapping
                     inkey--;
                     if (inkey == 0 && composed_key.str != "")
                     {
-                        _keyseq += Gdk.keyval_from_name(composed_key.str);
-                        composed_key.str = "";
+                        uint mods = 0;
+                        string ckey = composed_key.str;
+                        composed_key.truncate(0);
+
+                        while (ckey.length > 2 && ckey[1] == '-')
+                        {
+                            switch (ckey[0])
+                            {
+                            case 'S':
+                            case 's':
+                                mods |= KeyMod.SHIFT;
+                            break;
+                            case 'C':
+                            case 'c':
+                                mods |= KeyMod.CONTROL;
+                            break;
+                            case 'M':
+                            case 'm':
+                                mods |= KeyMod.META;
+                            break;
+                            case 'T':
+                            case 't':
+                                mods |= KeyMod.SUPER;
+                            break;
+                            default:
+                            break;
+                            }
+                            ckey = ckey.offset(2);
+                        }
+
+                        _keymod += mods == 0 ? KeyMod.ANY : mods;
+                        _keyseq += Gdk.keyval_from_name(ckey);
                         continue;
                     }
                 }
@@ -373,6 +408,7 @@ public class GfmimMapping
                 else
                 {
                     _keyseq += Gdk.unicode_to_keyval(c);
+                    _keymod += KeyMod.ANY;
                 }
             }
         }
@@ -389,15 +425,21 @@ public class GfmimMapping
     <S-> => 1,
     <T-> => 67108928.
     */
-    public bool match_key(uint[] key)
+    public bool match_key(uint[] key, uint[] mod)
     requires (key.length > 0)
+    requires (mod.length == key.length)
     {
         stderr.printf("that key: %u\n", key[0]);
         stderr.printf("this key: %u\n", this._keyseq[0]);
         /*return this._keycode == key.keyval || this._keystr == key.str || Gdk.keyval_name(key.keyval) == this._keyname;*/
         if (key.length != this._keyseq.length) return false;
         for (int i = 0; i < key.length; i++)
+        {
+            stderr.printf("this: %u %u, that: %u %u\n", this._keymod[i], this._keyseq[i], mod[i], key[i]);
             if (key[i] != this._keyseq[i]) return false;
+            if (this._keymod[i] != KeyMod.ANY)
+                if (mod[i] != this._keymod[i]) return false;
+        }
         return true;
     }
 
@@ -415,6 +457,7 @@ public class GfmimMappings
         this.add_mapping("<colon>").activate.connect((s, c) => { (s as GfmimWindow).change_mode(GfmimMode.COMMAND); });
         this.add_mapping("ZZ").activate.connect((s, c) => { (s as GfmimWindow).execute_command("quit"); });
         this.add_mapping("/").activate.connect((s, c) => { (s as GfmimWindow).change_mode(GfmimMode.SEARCH); });
+        /*this.add_mapping("<C-a>").activate.connect((s, c) => { (s as GfmimWindow).execute_command("echo it's okey!"); });*/
     }
 
     public GfmimMapping add_mapping(string keyname)
@@ -425,23 +468,30 @@ public class GfmimMappings
     }
 
     uint[] key_buffer;
+    uint[] key_modifiers;
     uint32 key_timeout;
     uint key_count;
+
+    private void reset_buffers()
+    {
+        this.key_buffer = {};
+        this.key_modifiers = {};
+        this.key_count = 0;
+    }
+
     public GfmimMapping? find_mapping(Gdk.EventKey key)
     {
         // сброс по таймауту
         if ((key.time - this.key_timeout) > 1000)
         {
-            this.key_buffer = {};
-            this.key_count = 0;
+            this.reset_buffers();
         }
         this.key_timeout = key.time;
 
         // безусловный сброс по Esc
         if (key.keyval == 65307)
         {
-            this.key_buffer = {};
-            this.key_count = 0;
+            this.reset_buffers();
         }
         // увеличение параметра count
         else if ((key.state == 0) && (47 < key.keyval) && (key.keyval < 58))
@@ -452,12 +502,13 @@ public class GfmimMappings
         // обычная клавиша
         else
         {
+            this.key_modifiers += key.state & GfmimMapping.KeyMod.ALL;
             this.key_buffer += key.keyval;
             foreach (GfmimMapping map in this.list)
             {
-                if (map.match_key(this.key_buffer))
+                if (map.match_key(this.key_buffer, this.key_modifiers))
                 {
-                    this.key_buffer = {};
+                    this.reset_buffers();
                     return map;
                 }
             }
