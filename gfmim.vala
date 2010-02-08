@@ -257,6 +257,7 @@ public class GfmimCommands
     }
 
     public void execute(Gtk.Widget source, string command) throws GfmimCommandError
+    requires (command != "")
     {
         var parser = new GfmimCommandParser(command);
         GfmimCommand cmd = this.find_command(parser.name);
