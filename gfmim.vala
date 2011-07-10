@@ -1,4 +1,5 @@
 using Gtk;
+// modules: gtk-+2.0 gmodule-2.0
 
 // Commands {{{
 
@@ -61,8 +62,8 @@ public class GfmimCommandParser
                 } else if (match[3] != "") {
                     count = match[3].to_int();
                 }
-                if (match[0].len() < command.len())
-                    argline = command.substring(match[0].len());
+                if (match[0].length < command.length)
+                    argline = command.substring(match[0].length);
                 return;
             }
         } catch (RegexError e) {
@@ -80,7 +81,7 @@ public class GfmimCommandParser
         bool str = false;
         string[] result = {};
         var arg = new StringBuilder();
-        for (int i = 0; i < args.len(); i++)
+        for (int i = 0; i < args.length; i++)
         {
             unichar c = args[i];
             if (esc) { arg.append_unichar(c); esc = false; }
@@ -114,12 +115,12 @@ public class GfmimCommandParser
         switch (num_args)
         {
         case GfmimCommandNargs.NONE: 
-            if (this.argline.len() > 0)
+            if (this.argline.length > 0)
                 throw new GfmimCommandError.TrailingChars("E488: trailing characters");
             break;
         case GfmimCommandNargs.SINGLE:
         case GfmimCommandNargs.MANY:
-            if (this.argline.len() < 1)
+            if (this.argline.length < 1)
                 throw new GfmimCommandError.ArgRequired("E475: argument required");
             if (num_args == GfmimCommandNargs.MANY)
                 this.args = this.split_string(this.argline);
@@ -130,7 +131,7 @@ public class GfmimCommandParser
             this.args = this.split_string(this.argline);
             break;
         case GfmimCommandNargs.ONE:
-            if (this.argline.len() > 0)
+            if (this.argline.length > 0)
                 this.args = { this.argline };
             break;
         default:
@@ -154,6 +155,15 @@ public class GfmimCommand
     public string shortname { get { return _shortname; } }
     public string fullname { get { return _fullname; } }
 
+	public GfmimCommand.full(string name, GfmimCommandNargs nargs=GfmimCommandNargs.NONE,
+						bool has_bang=false, bool has_range=false, bool system=false) {
+		this.name = name;
+		this._has_bang = has_bang;
+		this._has_range = has_range;
+		this._num_args = nargs;
+		this._system = system;
+	}
+
     public string name {
         get { return _name; }
         protected set {
@@ -162,8 +172,8 @@ public class GfmimCommand
             if (part == null) {
                 _fullname = _shortname = _name;
             } else {
-                _shortname = _name.substring(0, _name.len()-part.len());
-                _fullname  = _shortname + part.substring(1, part.len()-2);
+                _shortname = _name.substring(0, _name.length-part.length);
+                _fullname  = _shortname + part.substring(1, part.length-2);
             }
         }
     }
@@ -177,10 +187,10 @@ public class GfmimCommand
 
     public bool match_name(string name)
     {
-        return name.len() >= this._shortname.len() && this._fullname.has_prefix(name);
+        return name.length >= this._shortname.length && this._fullname.has_prefix(name);
     }
 
-    public virtual void execute(Gtk.Widget source, GfmimCommandParser parser) throws GfmimCommandError
+    public virtual void execute(GfmimWindow source, GfmimCommandParser parser) throws GfmimCommandError
     {
         parser.parse_args(this._num_args);
         if (this.check(parser))
@@ -188,7 +198,7 @@ public class GfmimCommand
         return;
     }
 
-    public signal void activate(Gtk.Widget source, GfmimCommandParser parser);
+    public signal void activate(GfmimWindow source, GfmimCommandParser parser);
 }
 // 2}}}
 
@@ -201,7 +211,7 @@ public class GfmimCommandEchoerr: GfmimCommand
         this.name    = "echoe[rr]";
         this._system = true;
         this._num_args  = GfmimCommandNargs.SINGLE;
-        this.activate.connect((s, p) => { (s as GfmimWindow).statusbar.show_error(p.args[0]); });
+        this.activate.connect((s, p) => { s.statusbar.show_error(p.args[0]); });
     }
 }
 
@@ -212,7 +222,7 @@ public class GfmimCommandEcho : GfmimCommand
         this.name = "ec[ho]";
         this._system = true;
         this._num_args = GfmimCommandNargs.SINGLE;
-        this.activate.connect((s, p) => { (s as GfmimWindow).statusbar.show_message(p.args[0]); });
+        this.activate.connect((s, p) => { s.statusbar.show_message(p.args[0]); });
     }
 }
 
@@ -256,7 +266,7 @@ public class GfmimCommands
         throw new GfmimCommandError.NotFound("E492: command not found: %s".printf(name));
     }
 
-    public void execute(Gtk.Widget source, string command) throws GfmimCommandError
+    public void execute(GfmimWindow source, string command) throws GfmimCommandError
     requires (command != "")
     {
         var parser = new GfmimCommandParser(command);
@@ -354,7 +364,7 @@ public class GfmimMapping
 
             int inkey = 0;
             var composed_key = new StringBuilder();
-            for (int i = 0; i < _keyname.len(); i++)
+            for (int i = 0; i < _keyname.length; i++)
             {
                 unichar c = _keyname[i];
                 if (c == '<') {
@@ -443,7 +453,7 @@ public class GfmimMapping
         return true;
     }
 
-    public signal void activate (Gtk.Window source, uint count = 0);
+    public signal void activate(GfmimWindow source, uint count = 0);
 }
 
 public class GfmimMappings
@@ -454,10 +464,14 @@ public class GfmimMappings
     {
         list = new GLib.List<GfmimMapping>();
 
-        this.add_mapping("<colon>").activate.connect((s, c) => { (s as GfmimWindow).change_mode(GfmimMode.COMMAND); });
-        this.add_mapping("ZZ").activate.connect((s, c) => { (s as GfmimWindow).execute_command("quit"); });
-        this.add_mapping("/").activate.connect((s, c) => { (s as GfmimWindow).change_mode(GfmimMode.SEARCH); });
-        /*this.add_mapping("<C-a>").activate.connect((s, c) => { (s as GfmimWindow).execute_command("echo it's okey!"); });*/
+        this.add_mapping("<colon>").activate.connect((s, c) => { s.change_mode("Command"); });
+        this.add_mapping("ZZ").activate.connect((s, c) => { s.execute_command("quit"); });
+        this.add_mapping("/").activate.connect((s, c) => { s.change_mode("Search"); });
+        this.add_mapping("gg").activate.connect((s, c) => { s.set_cursor(0); });
+
+        this.add_mapping("k").activate.connect((s, c) => { s.move_cursor(-1); });
+        this.add_mapping("j").activate.connect((s, c) => { s.move_cursor(1); });
+        /*this.add_mapping("<C-a>").activate.connect((s, c) => { s.execute_command("echo it's okey!"); });*/
     }
 
     public GfmimMapping add_mapping(string keyname)
@@ -516,7 +530,7 @@ public class GfmimMappings
         return null;
     }
 
-    public void execute(Gtk.Window source, Gdk.EventKey key)
+    public void execute(GfmimWindow source, Gdk.EventKey key)
     {
         GfmimMapping map = this.find_mapping(key);
         if (map != null) map.activate(source, this.key_count);
@@ -525,13 +539,64 @@ public class GfmimMappings
 
 // }}}
 
-public enum GfmimMode
-{
-    NORMAL,
-    COMMAND,
-    VISUAL,
-    SEARCH,
+// Modes {{{
+
+public class GfmimMode {
+    public string name;
+    public signal void enter(GfmimWindow source);
+    public signal void leave(GfmimWindow source);
+
+    public GfmimMode(string name) {
+        this.name = name;
+    }
 }
+
+errordomain GfmimModesError {
+    NotFound,
+}
+
+public class GfmimModes {
+    private GLib.List<GfmimMode> list;
+    public GfmimMode current {
+        get; private set;
+    }
+
+    public GfmimModes() {
+        list = new GLib.List<GfmimMode>();
+        this.current = new GfmimMode("Normal");
+        list.append(current);
+
+        list.append(new GfmimMode("Command"));
+        list.append(new GfmimMode("Search"));
+
+    }
+
+    public void set_mode(GfmimWindow source, GfmimMode mode) {
+        this.current.leave(source);
+        this.current = mode;
+        this.current.enter(source);
+    }
+
+    public void set_mode_by_name(GfmimWindow source, string name) throws GfmimModesError {
+        GfmimMode? mode = this.get_by_name(name);
+        if (mode == null) {
+            throw new GfmimModesError.NotFound("Mode `%s' not found".printf(name));
+        }
+
+        this.set_mode(source, mode);
+    }
+
+    public GfmimMode? get_by_name(string name) {
+        foreach (GfmimMode mode in this.list) {
+            if (mode.name == name) {
+                return mode;
+            }
+        }
+        return null;
+    }
+}
+
+// }}}
 
 // Files tree storage {{{
 public class GfmimFilesLoader
@@ -652,7 +717,7 @@ public class GfmimWindow : Gtk.Window
         if (key.keyval == 65293)
         {
             string cmd = this.statusbar.get_command_line();
-            this.change_mode(GfmimMode.NORMAL);
+            this.change_mode("Normal");
             if (cmd != "")
                 this.execute_command(cmd);
             return true;
@@ -660,33 +725,17 @@ public class GfmimWindow : Gtk.Window
         return false;
     }
 
-    public void change_mode(GfmimMode newmode)
+    public void change_mode(string name)
     {
-        this.mode = newmode;
-        switch (newmode)
-        {
-            case GfmimMode.NORMAL:
-                this.statusbar.close_command_line();
-                this.key_press_event.disconnect(command_key_press_handler);
-                this.key_press_event.connect(normal_key_press_handler);
-            break;
-            case GfmimMode.COMMAND:
-                this.key_press_event.disconnect(normal_key_press_handler);
-                this.key_press_event.connect(command_key_press_handler);
-                this.statusbar.open_command_line(":");
-            break;
-            case GfmimMode.SEARCH:
-                this.key_press_event.disconnect(normal_key_press_handler);
-                this.key_press_event.connect(command_key_press_handler);
-                this.statusbar.open_command_line("/");
-            break;
-            default:
-            break;
+        try {
+            this.modes.set_mode_by_name(this, name);
+        } catch (GfmimModesError e) {
+            this.statusbar.show_error(e.message);
         }
     }
 
-    private GfmimMode mode = GfmimMode.NORMAL;
     public GfmimStatusbar statusbar;
+    private GfmimModes modes;
     private GfmimCommands commands;
     private GfmimMappings mappings;
 
@@ -706,7 +755,7 @@ public class GfmimWindow : Gtk.Window
         this.destroy.connect(Gtk.main_quit);
 
         statusbar = new GfmimStatusbar();
-        statusbar.command_line.focus_out_event.connect((src, ev) => { this.change_mode(GfmimMode.NORMAL); return false; });
+        statusbar.command_line.focus_out_event.connect((src, ev) => { this.change_mode("Normal"); return false; });
 
         fs_store = new GfmimFilesStore();
         fs_tree = new GfmimTreeView(fs_store);
@@ -719,7 +768,25 @@ public class GfmimWindow : Gtk.Window
 
         commands = new GfmimCommands();
         mappings = new GfmimMappings();
-        change_mode(GfmimMode.NORMAL);
+        modes = new GfmimModes();
+
+        modes.get_by_name("Normal").enter.connect((source) => {
+            source.statusbar.close_command_line();
+            source.key_press_event.disconnect(command_key_press_handler);
+            source.key_press_event.connect(normal_key_press_handler);
+        });
+        modes.get_by_name("Command").enter.connect((source) => {
+            source.key_press_event.disconnect(normal_key_press_handler);
+            source.key_press_event.connect(command_key_press_handler);
+            source.statusbar.open_command_line(":");
+        });
+        modes.get_by_name("Search").enter.connect((source) => {
+            source.key_press_event.disconnect(normal_key_press_handler);
+            source.key_press_event.connect(command_key_press_handler);
+            source.statusbar.open_command_line("/");
+        });
+
+        change_mode("Normal");
 
         fs_store.load_dir("/home/kstep/doc");
     }
@@ -732,6 +799,29 @@ public class GfmimWindow : Gtk.Window
             this.statusbar.show_error(e.message);
         }
         return;
+    }
+
+    public void move_cursor(int count=1)
+    {
+        this.fs_tree.move_cursor(Gtk.MovementStep.DISPLAY_LINES, count);
+    }
+
+    public void set_cursor(int line=0)
+    {
+        var path = new Gtk.TreePath.first();
+        for (int i = 0; i < line; i++) {
+            path.next();
+        }
+        this.fs_tree.set_cursor(path, null, false);
+    }
+
+    public void scroll_to(int x, int y)
+    {
+        Gtk.TreePath? path;
+        Gtk.TreeViewColumn? col;
+        int cellx, celly;
+        this.fs_tree.get_path_at_pos(x, y, out path, out col, out cellx, out celly);
+        this.fs_tree.set_cursor(path, col, false);
     }
 
     public static int main(string[] args)
