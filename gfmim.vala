@@ -472,7 +472,7 @@ public class GfmimMappings
         this.add_mapping("k").activate.connect((s, c) => { s.move_cursor(c == 0? -1: -((int)c)); });
         this.add_mapping("j").activate.connect((s, c) => { s.move_cursor(c == 0? 1: (int)c); });
 
-        this.add_mapping("<Return>").activate.connect((s, c) => { s.fs_tree.expand_collapse_cursor_row(true, true, false); });
+        this.add_mapping("<Return>").activate.connect((s, c) => { s.fs_tree.expand_collapse_cursor_row(true, !s.fs_tree.is_row_expanded(s.get_cursor()), false); });
         /*this.add_mapping("<C-a>").activate.connect((s, c) => { s.execute_command("echo it's okey!"); });*/
     }
 
@@ -633,14 +633,31 @@ public class GfmimFilesLoader
         this.load_dir_async.begin();
     }
 
+    public float humanize_size(int64 size, out string prefix)
+    {
+        string[] prefices = {"b", "Kib", "Mib", "Gib", "Tib", "Pib", "Eib", "Zib", "Yib"};
+        float result = size;
+
+        foreach (string pfx in prefices) {
+            prefix = pfx;
+            if (result <= 1024) break;
+            result /= 1024;
+        }
+        return result;
+    }
+
     private async void load_dir_async()
     {
         var dir = File.new_for_path(this.root_dir_name);
+        float size;
+        string prefix;
+
         try
         {
             var list = yield dir.enumerate_children_async(
-                FILE_ATTRIBUTE_STANDARD_NAME +","
-                + FILE_ATTRIBUTE_STANDARD_TYPE,
+                FILE_ATTRIBUTE_STANDARD_NAME +","+
+                FILE_ATTRIBUTE_STANDARD_TYPE +","+
+                FILE_ATTRIBUTE_STANDARD_SIZE,
                 0, Priority.DEFAULT, null);
 
             while (true)
@@ -650,9 +667,10 @@ public class GfmimFilesLoader
                 foreach (var finfo in files)
                 {
                     TreeIter item;
+                    size = this.humanize_size(finfo.get_size(), out prefix);
                     this.tree_store.append(out item, this.root_dir);
-                    this.tree_store.set(item, 0, finfo.get_name());
-                    /*stderr.printf("name: %s, type: %d, dirtype: %d\n", finfo.get_name(), finfo.get_file_type(), GLib.FileType.DIRECTORY);*/
+                    this.tree_store.set(item, 0, finfo.get_name(), 1, "%0.2f%s".printf(size, prefix), 2, finfo.get_size());
+
                     if (finfo.get_file_type() == GLib.FileType.DIRECTORY)
                     {
                         /*stderr.printf("dir: %s\n", finfo.get_name());*/
@@ -674,7 +692,7 @@ public class GfmimFilesStore : Gtk.TreeStore
 
     public GfmimFilesStore()
     {
-        GLib.Type[] types = { typeof(string) };
+        GLib.Type[] types = { typeof(string), typeof(string), typeof(int64) };
         set_column_types(types);
     }
 
@@ -694,6 +712,11 @@ public class GfmimTreeView : Gtk.TreeView
     {
         set_model(model);
         insert_column_with_attributes(-1, "Filename", new CellRendererText(), "text", 0);
+        insert_column_with_attributes(-1, "Size", new CellRendererText(), "text", 1);
+        get_column(0).sort_column_id = 0;
+        get_column(1).sort_column_id = 2;
+        headers_clickable = true;
+
 
         scroller = new ScrolledWindow(null, null);
         scroller.set_policy(PolicyType.NEVER, PolicyType.AUTOMATIC);
