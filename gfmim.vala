@@ -1,5 +1,5 @@
 using Gtk;
-// modules: gtk-+2.0 gmodule-2.0
+// modules: gtk-+2.0 gmodule-2.0 gee-1.0
 
 // Commands {{{
 
@@ -469,8 +469,10 @@ public class GfmimMappings
         this.add_mapping("/").activate.connect((s, c) => { s.change_mode("Search"); });
         this.add_mapping("gg").activate.connect((s, c) => { s.set_cursor(0); });
 
-        this.add_mapping("k").activate.connect((s, c) => { s.move_cursor(-1); });
-        this.add_mapping("j").activate.connect((s, c) => { s.move_cursor(1); });
+        this.add_mapping("k").activate.connect((s, c) => { s.move_cursor(c == 0? -1: -((int)c)); });
+        this.add_mapping("j").activate.connect((s, c) => { s.move_cursor(c == 0? 1: (int)c); });
+
+        this.add_mapping("<Return>").activate.connect((s, c) => { s.fs_tree.expand_collapse_cursor_row(true, true, false); });
         /*this.add_mapping("<C-a>").activate.connect((s, c) => { s.execute_command("echo it's okey!"); });*/
     }
 
@@ -522,7 +524,6 @@ public class GfmimMappings
             {
                 if (map.match_key(this.key_buffer, this.key_modifiers))
                 {
-                    this.reset_buffers();
                     return map;
                 }
             }
@@ -533,7 +534,11 @@ public class GfmimMappings
     public void execute(GfmimWindow source, Gdk.EventKey key)
     {
         GfmimMapping map = this.find_mapping(key);
-        if (map != null) map.activate(source, this.key_count);
+        if (map != null) {
+            stderr.printf("key_count: %u\n", this.key_count);
+            map.activate(source, this.key_count);
+            this.reset_buffers();
+        }
     }
 }
 
@@ -740,7 +745,7 @@ public class GfmimWindow : Gtk.Window
     private GfmimMappings mappings;
 
     private GfmimFilesStore fs_store;
-    private GfmimTreeView fs_tree;
+    public GfmimTreeView fs_tree;
 
     private enum FsColumns
     {
@@ -803,7 +808,11 @@ public class GfmimWindow : Gtk.Window
 
     public void move_cursor(int count=1)
     {
-        this.fs_tree.move_cursor(Gtk.MovementStep.DISPLAY_LINES, count);
+        int dir = count > 0? 1: -1;
+        count = count.abs();
+        for (int i = 0; i < count; i++) {
+            this.fs_tree.move_cursor(Gtk.MovementStep.DISPLAY_LINES, dir);
+        }
     }
 
     public void set_cursor(int line=0)
@@ -813,6 +822,14 @@ public class GfmimWindow : Gtk.Window
             path.next();
         }
         this.fs_tree.set_cursor(path, null, false);
+    }
+
+    public TreePath get_cursor()
+    {
+        GLib.List<TreePath> result;
+        TreeModel model;
+        result = this.fs_tree.get_selection().get_selected_rows(out model);
+        return result.nth_data(0);
     }
 
     public void scroll_to(int x, int y)
