@@ -1,5 +1,5 @@
 using Gtk;
-// modules: gtk-+2.0 gmodule-2.0 gee-1.0
+// modules: gtk+-2.0 gmodule-2.0 posix
 
 // Commands {{{
 
@@ -633,30 +633,20 @@ public class GfmimFilesLoader
         this.load_dir_async.begin();
     }
 
-    public float humanize_size(int64 size, out string prefix)
-    {
-        string[] prefices = {"b", "Kib", "Mib", "Gib", "Tib", "Pib", "Eib", "Zib", "Yib"};
-        float result = size;
-
-        foreach (string pfx in prefices) {
-            prefix = pfx;
-            if (result <= 1024) break;
-            result /= 1024;
-        }
-        return result;
-    }
-
     private async void load_dir_async()
     {
         var dir = File.new_for_path(this.root_dir_name);
-        float size;
-        string prefix;
 
         try
         {
             var list = yield dir.enumerate_children_async(
                 FILE_ATTRIBUTE_STANDARD_NAME +","+
                 FILE_ATTRIBUTE_STANDARD_TYPE +","+
+                FILE_ATTRIBUTE_STANDARD_CONTENT_TYPE +","+
+                FILE_ATTRIBUTE_STANDARD_ICON +","+
+                FILE_ATTRIBUTE_OWNER_USER +","+
+                FILE_ATTRIBUTE_OWNER_GROUP +","+
+                FILE_ATTRIBUTE_UNIX_MODE +","+
                 FILE_ATTRIBUTE_STANDARD_SIZE,
                 0, Priority.DEFAULT, null);
 
@@ -667,9 +657,15 @@ public class GfmimFilesLoader
                 foreach (var finfo in files)
                 {
                     TreeIter item;
-                    size = this.humanize_size(finfo.get_size(), out prefix);
                     this.tree_store.append(out item, this.root_dir);
-                    this.tree_store.set(item, 0, finfo.get_name(), 1, "%0.2f%s".printf(size, prefix), 2, finfo.get_size());
+                    this.tree_store.set(item,
+                        0, finfo.get_name(),
+                        1, finfo.get_size(),
+                        2, finfo.get_content_type(),
+                        3, finfo.get_icon(),
+                        4, finfo.get_attribute_uint32(FILE_ATTRIBUTE_UNIX_MODE),
+                        5, finfo.get_attribute_string(FILE_ATTRIBUTE_OWNER_USER),
+                        6, finfo.get_attribute_string(FILE_ATTRIBUTE_OWNER_GROUP));
 
                     if (finfo.get_file_type() == GLib.FileType.DIRECTORY)
                     {
@@ -692,7 +688,15 @@ public class GfmimFilesStore : Gtk.TreeStore
 
     public GfmimFilesStore()
     {
-        GLib.Type[] types = { typeof(string), typeof(string), typeof(int64) };
+        GLib.Type[] types = {
+            typeof(string), // name
+            typeof(int64),  // size
+            typeof(string), // mimetype
+            typeof(Icon),   // icon
+            typeof(uint32), // mode (perm)
+            typeof(string), // owner
+            typeof(string)  // group
+            };
         set_column_types(types);
     }
 
@@ -704,6 +708,60 @@ public class GfmimFilesStore : Gtk.TreeStore
 }
 // }}}
 
+public class CellRendererPermText : CellRendererText {
+    private uint32 _filemode;
+
+    public uint32 filemode {
+        get {
+            return _filemode;
+        }
+        set {
+            _filemode = value;
+            text = ((value & Posix.S_IRUSR) == 0? "-": "r") +
+                   ((value & Posix.S_IWUSR) == 0? "-": "w") +
+                   ((value & Posix.S_IXUSR) == 0? "-": "x") +
+                   ((value & Posix.S_IRGRP) == 0? "-": "r") +
+                   ((value & Posix.S_IWGRP) == 0? "-": "w") +
+                   ((value & Posix.S_IXGRP) == 0? "-": "x") +
+                   ((value & Posix.S_IROTH) == 0? "-": "r") +
+                   ((value & Posix.S_IWOTH) == 0? "-": "w") +
+                   ((value & Posix.S_IXOTH) == 0? "-": "x");
+        }
+    }
+}
+
+public class CellRendererSizeText : CellRendererText {
+    private int64 _filesize;
+    private const int power = 1024;
+
+    public float humanize_size(int64 size, out string unit)
+    {
+        string[] units = {"b", "Kib", "Mib", "Gib", "Tib", "Pib", "Eib", "Zib", "Yib"};
+        float result = size;
+
+        foreach (string u in units) {
+            unit = u;
+            if (result <= power) break;
+            result /= power;
+        }
+        return result;
+    }
+
+    public int64 filesize {
+        get {
+            return _filesize;
+        }
+        set {
+            float shortsize;
+            string unit;
+
+            _filesize = value;
+            shortsize = humanize_size(value, out unit);
+            text = "%0.2f%s".printf(shortsize, unit);
+        }
+    }
+}
+
 public class GfmimTreeView : Gtk.TreeView
 {
     public ScrolledWindow scroller { get; private set; }
@@ -711,10 +769,21 @@ public class GfmimTreeView : Gtk.TreeView
     public GfmimTreeView(GfmimFilesStore model)
     {
         set_model(model);
+        insert_column_with_attributes(-1, "", new CellRendererPixbuf(), "gicon", 3);
         insert_column_with_attributes(-1, "Filename", new CellRendererText(), "text", 0);
-        insert_column_with_attributes(-1, "Size", new CellRendererText(), "text", 1);
-        get_column(0).sort_column_id = 0;
-        get_column(1).sort_column_id = 2;
+        insert_column_with_attributes(-1, "Size", new CellRendererSizeText(), "filesize", 1);
+        insert_column_with_attributes(-1, "Mimetype", new CellRendererText(), "text", 2);
+        insert_column_with_attributes(-1, "Perms", new CellRendererPermText(), "filemode", 4);
+        insert_column_with_attributes(-1, "Owner", new CellRendererText(), "text", 5);
+        insert_column_with_attributes(-1, "Group", new CellRendererText(), "text", 6);
+
+        get_column(1).sort_column_id = 0;
+        get_column(2).sort_column_id = 1;
+        get_column(3).sort_column_id = 2;
+        get_column(4).sort_column_id = 4;
+        get_column(5).sort_column_id = 5;
+        get_column(6).sort_column_id = 6;
+
         headers_clickable = true;
 
 
@@ -816,7 +885,7 @@ public class GfmimWindow : Gtk.Window
 
         change_mode("Normal");
 
-        fs_store.load_dir("/home/kstep/doc");
+        fs_store.load_dir("/home/kstep/video");
     }
 
     public void execute_command(string command)
