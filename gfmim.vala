@@ -614,8 +614,6 @@ public class GfmimFilesLoader
 
     public GfmimFilesLoader(string dirname, GfmimFilesStore store)
     {
-        store.append(out root_dir, null);
-        store.set(root_dir, 0, dirname);
         root_dir = null;
         tree_store = store;
         root_dir_name = dirname;
@@ -857,7 +855,8 @@ public class GfmimWindow : Gtk.Window
 
     public GfmimWindow(string init_dir=".")
     {
-        this.title = "Gfmim";
+        var dir = GLib.File.new_for_path(init_dir);
+        this.title = "Gfmim - " + dir.get_path();
         this.destroy.connect(Gtk.main_quit);
 
         statusbar = new GfmimStatusbar();
