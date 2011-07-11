@@ -472,7 +472,7 @@ public class GfmimMappings
         this.add_mapping("k").activate.connect((s, c) => { s.move_cursor(c == 0? -1: -((int)c)); });
         this.add_mapping("j").activate.connect((s, c) => { s.move_cursor(c == 0? 1: (int)c); });
 
-        this.add_mapping("<Return>").activate.connect((s, c) => { s.fs_tree.expand_collapse_cursor_row(true, !s.fs_tree.is_row_expanded(s.get_cursor()), false); });
+        /*this.add_mapping("<Return>").activate.connect((s, c) => { s.fs_tree.expand_collapse_cursor_row(true, !s.fs_tree.is_row_expanded(s.get_cursor()), false); });*/
         /*this.add_mapping("<C-a>").activate.connect((s, c) => { s.execute_command("echo it's okey!"); });*/
     }
 
@@ -610,12 +610,12 @@ public class GfmimFilesLoader
     private string root_dir_name;
     private GfmimFilesStore tree_store;
 
-    private GLib.List<GfmimFilesLoader> subloaders;
+    /*private GLib.List<GfmimFilesLoader> subloaders;*/
 
     public GfmimFilesLoader(string dirname, GfmimFilesStore store)
     {
-        store.append(out root_dir, null);
-        store.set(root_dir, 0, dirname);
+        /*store.append(out root_dir);//, null);*/
+        /*store.set(root_dir, 0, dirname);*/
         root_dir = null;
         tree_store = store;
         root_dir_name = dirname;
@@ -649,15 +649,16 @@ public class GfmimFilesLoader
                 if (files == null) break;
                 foreach (var finfo in files)
                 {
-                    var item = this.tree_store.add(finfo, this.root_dir);
+                    /*var item = */this.tree_store.add(finfo);//, this.root_dir);
 
+                    /*
                     if (finfo.get_file_type() == GLib.FileType.DIRECTORY)
                     {
-                        /*stderr.printf("dir: %s\n", finfo.get_name());*/
                         var subloader = new GfmimFilesLoader.from_iter(item, this.root_dir_name + "/" + finfo.get_name(), this.tree_store);
                         this.subloaders.append(subloader);
                         subloader.load_dir();
                     }
+                    */
                 }
             }
         } catch (GLib.Error e) {
@@ -666,12 +667,13 @@ public class GfmimFilesLoader
     }
 }
 
-public class GfmimFilesStore : Gtk.TreeStore
+public class GfmimFilesStore : Gtk.ListStore
 {
     public const string FILE_ATTRIBUTES = FILE_ATTRIBUTE_STANDARD_NAME +","+
         FILE_ATTRIBUTE_STANDARD_TYPE +","+
         FILE_ATTRIBUTE_STANDARD_CONTENT_TYPE +","+
-        FILE_ATTRIBUTE_STANDARD_ICON +","+
+        /*FILE_ATTRIBUTE_STANDARD_ICON +","+*/
+        FILE_ATTRIBUTE_THUMBNAIL_PATH +","+
         FILE_ATTRIBUTE_OWNER_USER +","+
         FILE_ATTRIBUTE_OWNER_GROUP +","+
         FILE_ATTRIBUTE_UNIX_MODE +","+
@@ -685,7 +687,7 @@ public class GfmimFilesStore : Gtk.TreeStore
             typeof(string), // name
             typeof(int64),  // size
             typeof(string), // mimetype
-            typeof(Icon),   // icon
+            typeof(Gdk.Pixbuf),   // icon
             typeof(uint32), // mode (perm)
             typeof(string), // owner
             typeof(string)  // group
@@ -696,13 +698,20 @@ public class GfmimFilesStore : Gtk.TreeStore
     public TreeIter add(FileInfo finfo, TreeIter? root_dir=null)
     {
         TreeIter item;
+        Gdk.Pixbuf? icon;
+        try {
+            icon = new Gdk.Pixbuf.from_file(finfo.get_attribute_byte_string(FILE_ATTRIBUTE_THUMBNAIL_PATH));
+        } catch (GLib.Error err) {
+            icon = null;
+        }
 
-        append(out item, root_dir);
+        append(out item);//, root_dir);
         set(item,
                 0, finfo.get_name(),
                 1, finfo.get_size(),
                 2, finfo.get_content_type(),
-                3, finfo.get_icon(),
+                /*3, finfo.get_icon(),*/
+                3, icon,
                 4, finfo.get_attribute_uint32(FILE_ATTRIBUTE_UNIX_MODE),
                 5, finfo.get_attribute_string(FILE_ATTRIBUTE_OWNER_USER),
                 6, finfo.get_attribute_string(FILE_ATTRIBUTE_OWNER_GROUP));
@@ -771,6 +780,38 @@ public class CellRendererSizeText : CellRendererText {
     }
 }
 
+public class CellRendererImage : CellRendererPixbuf {
+    private string _imagepath;
+    public string imagepath {
+        get {
+            return _imagepath;
+        }
+        set {
+            _imagepath = value;
+            try {
+                var image = new Gdk.Pixbuf.from_file(value);
+                pixbuf = image;
+            } catch (GLib.Error e) {
+            }
+        }
+    }
+}
+
+public class GfmimIconView : Gtk.IconView
+{
+    public ScrolledWindow scroller { get; private set; }
+    public GfmimIconView(GfmimFilesStore model)
+    {
+        set_model(model);
+        text_column = 0;
+        pixbuf_column = 3;
+
+        scroller = new ScrolledWindow(null, null);
+        scroller.set_policy(PolicyType.NEVER, PolicyType.AUTOMATIC);
+        scroller.add(this);
+    }
+}
+
 public class GfmimTreeView : Gtk.TreeView
 {
     public ScrolledWindow scroller { get; private set; }
@@ -778,7 +819,9 @@ public class GfmimTreeView : Gtk.TreeView
     public GfmimTreeView(GfmimFilesStore model)
     {
         set_model(model);
-        insert_column_with_attributes(-1, "", new CellRendererPixbuf(), "gicon", 3);
+        /*insert_column_with_attributes(-1, "", new CellRendererPixbuf(), "gicon", 3);*/
+        insert_column_with_attributes(-1, "", new CellRendererPixbuf(), "pixbuf", 3);
+        /*insert_column_with_attributes(-1, "thumbnail", new CellRendererText(), "text", 3);*/
         insert_column_with_attributes(-1, "Filename", new CellRendererText(), "text", 0);
         insert_column_with_attributes(-1, "Size", new CellRendererSizeText(), "filesize", 1);
         insert_column_with_attributes(-1, "Mimetype", new CellRendererText(), "text", 2);
@@ -846,7 +889,8 @@ public class GfmimWindow : Gtk.Window
     private GfmimMappings mappings;
 
     private GfmimFilesStore fs_store;
-    public GfmimTreeView fs_tree;
+    /*public GfmimTreeView fs_tree;*/
+    public GfmimIconView fs_tree;
 
     private enum FsColumns
     {
@@ -864,7 +908,7 @@ public class GfmimWindow : Gtk.Window
         statusbar.command_line.focus_out_event.connect((src, ev) => { this.change_mode("Normal"); return false; });
 
         fs_store = new GfmimFilesStore();
-        fs_tree = new GfmimTreeView(fs_store);
+        fs_tree = new GfmimIconView(fs_store);
 
         var vbox = new VBox(false, 0);
         /*vbox.pack_start();*/
@@ -925,6 +969,7 @@ public class GfmimWindow : Gtk.Window
         this.fs_tree.set_cursor(path, null, false);
     }
 
+/*
     public TreePath get_cursor()
     {
         GLib.List<TreePath> result;
@@ -932,7 +977,9 @@ public class GfmimWindow : Gtk.Window
         result = this.fs_tree.get_selection().get_selected_rows(out model);
         return result.nth_data(0);
     }
+    */
 
+/*
     public void scroll_to(int x, int y)
     {
         Gtk.TreePath? path;
@@ -941,6 +988,7 @@ public class GfmimWindow : Gtk.Window
         this.fs_tree.get_path_at_pos(x, y, out path, out col, out cellx, out celly);
         this.fs_tree.set_cursor(path, col, false);
     }
+*/
 
     public static int main(string[] args)
     {
