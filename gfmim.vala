@@ -4,7 +4,7 @@ using Gtk;
 // Commands {{{
 
 // Common declarations {{{2
-errordomain GfmimCommandError
+public errordomain GfmimCommandError
 {
     NotFound,
     NotParseable,
@@ -60,7 +60,7 @@ public class GfmimCommandParser
                     range.firstline = match[1];
                     range.lastline  = match[2];
                 } else if (match[3] != "") {
-                    count = match[3].to_int();
+                    count = int.parse(match[3]);
                 }
                 if (match[0].length < command.length)
                     argline = command.substring(match[0].length);
@@ -168,12 +168,12 @@ public class GfmimCommand
         get { return _name; }
         protected set {
             _name = value;
-            string? part = _name.str("[");
-            if (part == null) {
+            int part = _name.index_of("[");
+            if (part == -1) {
                 _fullname = _shortname = _name;
             } else {
-                _shortname = _name.substring(0, _name.length-part.length);
-                _fullname  = _shortname + part.substring(1, part.length-2);
+                _shortname = _name[0:part];
+                _fullname  = _shortname + _name[part+1:-1];
             }
         }
     }
@@ -402,7 +402,7 @@ public class GfmimMapping
                             default:
                             break;
                             }
-                            ckey = ckey.offset(2);
+                            ckey = ckey.substring(2, 1);
                         }
 
                         _keymod += mods == 0 ? KeyMod.ANY : mods;
@@ -556,7 +556,7 @@ public class GfmimMode {
     }
 }
 
-errordomain GfmimModesError {
+public errordomain GfmimModesError {
     NotFound,
 }
 
