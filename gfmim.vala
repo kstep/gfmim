@@ -846,13 +846,6 @@ public class GfmimWindow : Gtk.Window
     private GfmimFilesStore fs_store;
     public GfmimTreeView fs_tree;
 
-    private enum FsColumns
-    {
-        ICON,
-        TITLE,
-        NCOLS
-    }
-
     public GfmimWindow(string init_dir=".")
     {
         var dir = GLib.File.new_for_path(init_dir);
