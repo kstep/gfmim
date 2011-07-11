@@ -846,7 +846,7 @@ public class GfmimWindow : Gtk.Window
         NCOLS
     }
 
-    public GfmimWindow()
+    public GfmimWindow(string init_dir=".")
     {
         this.title = "Gfmim";
         this.destroy.connect(Gtk.main_quit);
@@ -885,7 +885,7 @@ public class GfmimWindow : Gtk.Window
 
         change_mode("Normal");
 
-        fs_store.load_dir("/home/kstep/video");
+        fs_store.load_dir(init_dir);
     }
 
     public void execute_command(string command)
@@ -936,9 +936,11 @@ public class GfmimWindow : Gtk.Window
     public static int main(string[] args)
     {
         Gtk.init(ref args);
-        var window = new GfmimWindow();
+
+        var window = new GfmimWindow(args[1] ?? ".");
         window.destroy.connect(Gtk.main_quit);
         window.show_all();
+
         Gtk.main();
         return 0;
     }
