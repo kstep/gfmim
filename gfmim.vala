@@ -640,14 +640,7 @@ public class GfmimFilesLoader
         try
         {
             var list = yield dir.enumerate_children_async(
-                FILE_ATTRIBUTE_STANDARD_NAME +","+
-                FILE_ATTRIBUTE_STANDARD_TYPE +","+
-                FILE_ATTRIBUTE_STANDARD_CONTENT_TYPE +","+
-                FILE_ATTRIBUTE_STANDARD_ICON +","+
-                FILE_ATTRIBUTE_OWNER_USER +","+
-                FILE_ATTRIBUTE_OWNER_GROUP +","+
-                FILE_ATTRIBUTE_UNIX_MODE +","+
-                FILE_ATTRIBUTE_STANDARD_SIZE,
+                GfmimFilesStore.FILE_ATTRIBUTES,
                 0, Priority.DEFAULT, null);
 
             while (true)
@@ -656,16 +649,7 @@ public class GfmimFilesLoader
                 if (files == null) break;
                 foreach (var finfo in files)
                 {
-                    TreeIter item;
-                    this.tree_store.append(out item, this.root_dir);
-                    this.tree_store.set(item,
-                        0, finfo.get_name(),
-                        1, finfo.get_size(),
-                        2, finfo.get_content_type(),
-                        3, finfo.get_icon(),
-                        4, finfo.get_attribute_uint32(FILE_ATTRIBUTE_UNIX_MODE),
-                        5, finfo.get_attribute_string(FILE_ATTRIBUTE_OWNER_USER),
-                        6, finfo.get_attribute_string(FILE_ATTRIBUTE_OWNER_GROUP));
+                    var item = this.tree_store.add(finfo, this.root_dir);
 
                     if (finfo.get_file_type() == GLib.FileType.DIRECTORY)
                     {
@@ -684,6 +668,15 @@ public class GfmimFilesLoader
 
 public class GfmimFilesStore : Gtk.TreeStore
 {
+    public const string FILE_ATTRIBUTES = FILE_ATTRIBUTE_STANDARD_NAME +","+
+        FILE_ATTRIBUTE_STANDARD_TYPE +","+
+        FILE_ATTRIBUTE_STANDARD_CONTENT_TYPE +","+
+        FILE_ATTRIBUTE_STANDARD_ICON +","+
+        FILE_ATTRIBUTE_OWNER_USER +","+
+        FILE_ATTRIBUTE_OWNER_GROUP +","+
+        FILE_ATTRIBUTE_UNIX_MODE +","+
+        FILE_ATTRIBUTE_STANDARD_SIZE;
+
     private GfmimFilesLoader loader;
 
     public GfmimFilesStore()
@@ -698,6 +691,22 @@ public class GfmimFilesStore : Gtk.TreeStore
             typeof(string)  // group
             };
         set_column_types(types);
+    }
+
+    public TreeIter add(FileInfo finfo, TreeIter? root_dir=null)
+    {
+        TreeIter item;
+
+        append(out item, root_dir);
+        set(item,
+                0, finfo.get_name(),
+                1, finfo.get_size(),
+                2, finfo.get_content_type(),
+                3, finfo.get_icon(),
+                4, finfo.get_attribute_uint32(FILE_ATTRIBUTE_UNIX_MODE),
+                5, finfo.get_attribute_string(FILE_ATTRIBUTE_OWNER_USER),
+                6, finfo.get_attribute_string(FILE_ATTRIBUTE_OWNER_GROUP));
+        return item;
     }
 
     public void load_dir(string dirname)
